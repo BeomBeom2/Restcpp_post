@@ -266,8 +266,7 @@ static char* sha256_file(const std::wstring path, size_t& packet_size)
         SHA256_Update(&sha256, buffer, file.gcount());
     }
     SHA256_Final(hash, &sha256);
-    sha256_hash_string(hash, file_hash);
-
+    sha256_hash_string(hash, file_hash); 
 
     packet_size = sizeof(file_hash);
     file.close();

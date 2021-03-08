@@ -311,6 +311,7 @@ unsigned char* Client_keyExchange(web::http::client::http_client& client, web::j
     return Secret_key;
 }
 
+/*서버와 키 교환*/
 bool Client_FileCheck(web::http::client::http_client& client)
 {
     /*비밀 키 생성*/
@@ -364,6 +365,7 @@ bool Client_FileCheck(web::http::client::http_client& client)
     CRYPTO_cleanup_all_ex_data();
     return 0;
 }
+
 std::wstring file_version()
 {
     web::json::value answer;
@@ -397,8 +399,8 @@ std::wstring file_version()
                     buildNum = HIWORD(pFineInfo->dwFileVersionLS);
                     revisionNum = LOWORD(pFineInfo->dwFileVersionLS);
 
-                    wVersion = L"\"v" + std::to_wstring(majorVer) + L"." + std::to_wstring(minorVer) +
-                                L"." + std::to_wstring(buildNum) + L"." + std::to_wstring(revisionNum) + L"\"";
+                    wVersion = std::to_wstring(majorVer) + L"." + std::to_wstring(minorVer) +
+                                L"." + std::to_wstring(buildNum) + L"." + std::to_wstring(revisionNum);
                 }
             }
             delete[] buffer;
@@ -470,10 +472,7 @@ bool VersionCheck()
                 /*설치파일 해시 생성*/
                 size_t hash_packet_size = 0;
                 const char* hash_data = sha256_file(wfolder_Path, hash_packet_size);
-                std::wstring wHash_data(&hash_data[0], &hash_data[hash_packet_size - 1]); 
-
-                std::string Client_hash;
-                convert_wstr2str(wHash_data, Client_hash);
+                std::string Client_hash(&hash_data[0], &hash_data[hash_packet_size - 1]); 
 
                 std::string Server_hash;
                 convert_wstr2str(info[L"file_hash"].as_string(), Server_hash);
@@ -509,8 +508,7 @@ bool VersionCheck()
         {
             printf("REQ ERROR, status code %u. \n", response.status_code());
         }
-    }).wait();
-
+    }).wait(); 
     return true;
 }
 
