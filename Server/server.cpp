@@ -3,9 +3,7 @@
 #include <cpprest/http_client.h>
 #include <cpprest/json.h>
 #include <openssl/sha.h>
-#include <stringapiset.h>
 #include <winbase.h>
-#include <oleauto.h>
 #include <atlconv.h>
 #include <openssl/ec.h>
 #include <openssl/ecdh.h>

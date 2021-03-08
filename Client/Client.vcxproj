@@ -149,11 +149,8 @@
   <ItemGroup>
     <ClCompile Include="base64.cpp" />
     <ClCompile Include="Client.cpp" />
-    <ClCompile Include="Client_class.cpp" />
     <ClCompile Include="diffie-hellman.cpp" />
-    <ClCompile Include="InterruptHandler.cpp" />
     <ClCompile Include="recyecle.cpp" />
-    <ClCompile Include="tt.cpp" />
     <ClCompile Include="zlib\adler32.c" />
     <ClCompile Include="zlib\compress.c" />
     <ClCompile Include="zlib\crc32.c" />
@@ -180,8 +177,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\source\repos\base64_test\base64_test\base64.h" />
-    <ClInclude Include="Client_class.h" />
-    <ClInclude Include="InterruptHandler.h" />
     <ClInclude Include="zlib\crc32.h" />
     <ClInclude Include="zlib\crypt.h" />
     <ClInclude Include="zlib\deflate.h" />

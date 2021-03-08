@@ -2,23 +2,19 @@
 #include <cpprest/http_client.h>
 #include <cpprest/json.h>
 #include <openssl/sha.h>
-#include <stringapiset.h>
 #include <winbase.h>
-#include <oleauto.h>
 #include <atlconv.h>
 #include <openssl/ec.h>
 #include <openssl/ecdh.h>
 /*NID_X9_62_prime256v1*/
 #include <openssl/evp.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
-#include <string.h>
+#include <string>
 #include "base64.h"
 #include <TCHAR.h>
 #include  "zlib/UnZipCTL.h"
 #include "zlib/FolderList.h"
-#include <tchar.h>
 #include <urlmon.h> 
 #pragma comment(lib, "cpprest141_2_10d.lib")
 #pragma comment(lib,"version.lib")
