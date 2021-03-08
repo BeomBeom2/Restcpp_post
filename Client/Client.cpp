@@ -397,7 +397,8 @@ std::wstring file_version()
                     buildNum = HIWORD(pFineInfo->dwFileVersionLS);
                     revisionNum = LOWORD(pFineInfo->dwFileVersionLS);
 
-                    wVersion = std::to_wstring(majorVer) + L"." + std::to_wstring(minorVer) + L"." + std::to_wstring(buildNum) + L"." + std::to_wstring(revisionNum);
+                    wVersion = L"\"v" + std::to_wstring(majorVer) + L"." + std::to_wstring(minorVer) +
+                                L"." + std::to_wstring(buildNum) + L"." + std::to_wstring(revisionNum) + L"\"";
                 }
             }
             delete[] buffer;
@@ -408,7 +409,7 @@ std::wstring file_version()
 
 bool VersionCheck()
 {
-    std::wstring&& Client_version = file_version();
+    std::wstring&& Client_version =  L"v1.3.0" /*file_version()*/;
     web::json::value info;
     web::json::value Client_fileVer = web::json::value::object();
     web::http::uri_builder uri(L"https://api.github.com/repos/BeomBeom2/Zabbix/releases/latest");
@@ -416,7 +417,7 @@ bool VersionCheck()
     web::http::client::http_client* github = new web::http::client::http_client(U("https://api.github.com/"));
     web::json::value latest_info;
     std::wstring latest_body;
-    std::wstring wfolder_Path = L"C:\\Unzip\\"; 
+    std::wstring wfolder_Path = L"C:\\Unzip"; 
 
     github->request(web::http::methods::GET, addr).then([&](web::http::http_response response)
     {
@@ -429,7 +430,12 @@ bool VersionCheck()
             auto array = latest_info[L"assets"].as_array();
             info[L"file_url"] = array[0][L"browser_download_url"];
             info[L"file_name"] = array[0][L"name"];
-            wfolder_Path += info[L"file_name"].as_string(); 
+
+            /*폴더 생성*/
+            if ((_waccess(wfolder_Path.c_str(), 0)) == -1)
+                CreateDirectory(wfolder_Path.c_str(), NULL);
+
+            wfolder_Path += L"\\" + info[L"file_name"].as_string(); 
 
             /*release body에서 hash값 parse */
             size_t index = latest_body.find(L"hash"); 
@@ -445,7 +451,7 @@ bool VersionCheck()
                 info[L"file_hash"] = web::json::value(L"hash load error");
             }
 
-            std::wcout << L"Client version is : " << Client_version << std::endl;
+            std::wcout << L"Client version is : " << L"\"" << Client_version << L"\"" << std::endl;
             std::wcout << L"Server version is : " << info[L"server_ver"] << std::endl;
 
             /*현재 파일 버전이 서버 버전과 일치 할 경우(최신 버전일 경우)*/
@@ -456,6 +462,7 @@ bool VersionCheck()
             else
             {
                 std::cout << "current version is not latest version\n download file!" << std::endl;
+
                 /*URL 바이너리 다운로드*/
                 HRESULT hr = URLDownloadToFile(NULL, info[L"file_url"].as_string().c_str(),
                     wfolder_Path.c_str(), 0, NULL);
@@ -463,9 +470,15 @@ bool VersionCheck()
                 /*설치파일 해시 생성*/
                 size_t hash_packet_size = 0;
                 const char* hash_data = sha256_file(wfolder_Path, hash_packet_size);
-                std::wstring wHash_data(&hash_data[0], &hash_data[hash_packet_size - 1]);
+                std::wstring wHash_data(&hash_data[0], &hash_data[hash_packet_size - 1]); 
 
-                if (!wcscmp(wHash_data.c_str(), info[L"file_hash"].as_string().c_str()))
+                std::string Client_hash;
+                convert_wstr2str(wHash_data, Client_hash);
+
+                std::string Server_hash;
+                convert_wstr2str(info[L"file_hash"].as_string(), Server_hash);
+
+                if (!_strcmpi(Client_hash.c_str(), Server_hash.c_str()))
                 {
                     std::cout << "파일 해시 일치" << std::endl;
                     HINSTANCE result = ::ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
@@ -499,10 +512,6 @@ bool VersionCheck()
     }).wait();
 
     return true;
-}
-
-void Client_class()
-{ 
 }
 
 int main()
