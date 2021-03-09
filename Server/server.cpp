@@ -3,7 +3,6 @@
 #include <cpprest/http_client.h>
 #include <cpprest/json.h>
 #include <openssl/sha.h>
-#include <winbase.h>
 #include <atlconv.h>
 #include <openssl/ec.h>
 #include <openssl/ecdh.h>
@@ -12,35 +11,27 @@
 #include "base64.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
 #include <TCHAR.h>
 #include  "zlib/ZipCTL.h"
 #include "zlib/FolderList.h"
 
 #pragma comment(lib, "cpprest141_2_10d")
-
-using namespace web;
-using namespace web::http;
-using namespace web::http::client;
-using namespace web::http::experimental::listener;
-
-#include <iostream>
-#include <map>
-#include <set>
-#include <string>
-
+ 
+#include <iostream> 
+#include <set> 
 
 #define TRACE(msg)            wcout << msg
 #define TRACE_ACTION(a, k, v) wcout << a << L" (" << k << L", " << v << L")\n"
 
-bool Server_keyExchange(const json::array& req_array, json::value& answer);
+bool Server_keyExchange(const web::json::array& req_array, web::json::value& answer);
 static char* sha256_file(const std::wstring path, size_t& packet_size);
 void sha256_hash_string(unsigned char hash[SHA256_DIGEST_LENGTH], char outputBuffer[65]);
 
 std::map<utility::string_t, utility::string_t> dictionary;
 enum class DATA_TYPE { _REQ_CHECK = 0, _KEY_EXCHANGE };
 void display_json(
-    json::value const& jvalue,
+    web::json::value const& jvalue,
     utility::string_t const& prefix)
 {
     std::wcout << prefix << jvalue.serialize() << std::endl;
@@ -69,13 +60,13 @@ void sha256_hash_string(unsigned char hash[SHA256_DIGEST_LENGTH], char outputBuf
 }
 
 void handle_request(
-    http_request request,
-    std::function<void(json::value const&, json::value&)> action)
+    web::http::http_request request,
+    std::function<void(web::json::value const&, web::json::value&)> action)
 {
-    auto answer = json::value::object();
+    auto answer = web::json::value::object();
     request
         .extract_json()
-        .then([&answer, &action](pplx::task<json::value> task) {
+        .then([&answer, &action](pplx::task<web::json::value> task) {
         try
         {
             auto const& jvalue = task.get();
@@ -86,24 +77,24 @@ void handle_request(
                 action(jvalue, answer);
             }
         }
-        catch (http_exception const& e)
+        catch (web::http::http_exception const& e)
         {
             std::wcout << e.what() << std::endl;
         }
             })
         .wait();
             display_json(answer, L"S: ");
-            request.reply(status_codes::OK, answer);
+            request.reply(web::http::status_codes::OK, answer);
 }
 
 
-void handle_put(http_request request)
+void handle_put(web::http::http_request request)
 {
     std::TRACE("\nhandle PUT\n");
 
     handle_request(
         request,
-        [](json::value const& jvalue, json::value& answer)
+        [](web::json::value const& jvalue, web::json::value& answer)
         {
             for (auto const& e : jvalue.as_object()) //as_object : JSON 값이 객체 값인 경우에만 json 객체로 변환
             {
@@ -115,12 +106,12 @@ void handle_put(http_request request)
                     if (dictionary.find(key) == dictionary.end())
                     {
                         std::TRACE_ACTION(L"added", key, value);
-                        answer[key] = json::value::string(L"<put>");
+                        answer[key] = web::json::value::string(L"<put>");
                     }
                     else
                     {
                         std::TRACE_ACTION(L"updated", key, value);
-                        answer[key] = json::value::string(L"<updated>");
+                        answer[key] = web::json::value::string(L"<updated>");
                     }
 
                     dictionary[key] = value;
@@ -129,13 +120,13 @@ void handle_put(http_request request)
         });
 }
 
-void handle_del(http_request request)
+void handle_del(web::http::http_request request)
 {
     std::TRACE("\nhandle DEL\n");
 
     handle_request(
         request,
-        [](json::value const& jvalue, json::value& answer)
+        [](web::json::value const& jvalue, web::json::value& answer)
         {
             std::set<utility::string_t> keys;
             for (auto const& e : jvalue.as_array())
@@ -147,12 +138,12 @@ void handle_del(http_request request)
                     auto pos = dictionary.find(key);
                     if (pos == dictionary.end())
                     {
-                        answer[key] = json::value::string(L"<failed>");
+                        answer[key] = web::json::value::string(L"<failed>");
                     }
                     else
                     {
                         std::TRACE_ACTION(L"deleted", pos->first, pos->second);
-                        answer[key] = json::value::string(L"<deleted>");
+                        answer[key] = web::json::value::string(L"<deleted>");
                         keys.insert(key);
                     }
                 }
@@ -274,7 +265,7 @@ static char* sha256_file(const std::wstring path, size_t& packet_size)
     return file_hash;
 }
 
-unsigned char* Server_KeyExchange(const json::value& req_array, json::value& answer) {
+unsigned char* Server_KeyExchange(const web::json::value& req_array, web::json::value& answer) {
     EC_KEY* Server_Key, * tmpkey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
     int SecretKey_Len;
     unsigned char* Secret_key = NULL;
@@ -311,8 +302,8 @@ unsigned char* Server_KeyExchange(const json::value& req_array, json::value& ans
     std::string str_size = std::to_string(size);
     convert_str2wstr(str_size, wstr_size);
 
-    answer[L"key_data"] = json::value::string(wstr_encoded);
-    answer[L"key_size"] = json::value::string(wstr_size);
+    answer[L"key_data"] = web::json::value::string(wstr_encoded);
+    answer[L"key_size"] = web::json::value::string(wstr_size);
 
     /*받은 클라이언트 키로 최종 비밀 키 생성*/
     SecretKey_Len = EC_DH(&Secret_key, Server_Key, EC_KEY_get0_public_key(tmpkey));
@@ -328,7 +319,7 @@ unsigned char* Server_KeyExchange(const json::value& req_array, json::value& ans
     return Secret_key;
 }
 
-bool Server_FileCheck(const json::value& req_array, web::json::value& answer)
+bool Server_FileCheck(const web::json::value& req_array, web::json::value& answer)
 {
     /*서버 비밀 키 생성*/
     unsigned char* Secret_key = Server_KeyExchange(req_array, answer);
@@ -349,8 +340,8 @@ bool Server_FileCheck(const json::value& req_array, web::json::value& answer)
     std::wstring wpacket_size;
     convert_str2wstr(spacket_size, wpacket_size);
 
-    answer[L"zip_data"] = json::value::string(wzip_encoded);
-    answer[L"zip_size"] = json::value::string(wpacket_size);
+    answer[L"zip_data"] = web::json::value::string(wzip_encoded);
+    answer[L"zip_size"] = web::json::value::string(wpacket_size);
     spacket_size.clear();
     wpacket_size.clear();
 
@@ -363,8 +354,8 @@ bool Server_FileCheck(const json::value& req_array, web::json::value& answer)
     spacket_size = std::to_string(hash_packet_size);
     convert_str2wstr(spacket_size, wpacket_size);
 
-    answer[L"hash_size"] = json::value::string(wpacket_size);
-    answer[L"hash_data"] = json::value::string(wHash_data);
+    answer[L"hash_size"] = web::json::value::string(wpacket_size);
+    answer[L"hash_data"] = web::json::value::string(wHash_data);
     display_json(answer, L"Server-Response : ");
 
     free(Secret_key);
@@ -373,28 +364,28 @@ bool Server_FileCheck(const json::value& req_array, web::json::value& answer)
     return true;
 }
 
-bool Server_VersionCheck(const json::value& req_array, web::json::value& answer)
+bool Server_VersionCheck(const web::json::value& req_array, web::json::value& answer)
 {
     std::wstring wstr_encoded = req_array.at(L"version").as_string();
 
-    uri_builder uri(L"https://api.github.com/repos/BeomBeom2/Zabbix/releases/latest");
+    web::http::uri_builder uri(L"https://api.github.com/repos/BeomBeom2/Zabbix/releases/latest");
     auto addr = uri.to_string();
-    http_client github(U("https://api.github.com/"));
+    web::http::client::http_client github(U("https://api.github.com/"));
 
-    github.request(methods::GET, addr).then([&](http_response response)
+    github.request(web::http::methods::GET, addr).then([&](web::http::http_response response)
         {
-            if (response.status_code() == status_codes::OK)
+            if (response.status_code() == web::http::status_codes::OK)
             {
-                json::value latest_data = response.extract_json().get();
+                web::json::value latest_data = response.extract_json().get();
                 std::wstring version = latest_data.at(L"tag_name").as_string();
 
-                answer[L"version"] = json::value::string(version);
+                answer[L"version"] = web::json::value::string(version);
                 if(!wcscmp(wstr_encoded.c_str(), version.c_str()))
                 {
-                    answer[L"result"] = json::value::string(L"true");
+                    answer[L"result"] = web::json::value::string(L"true");
                 }
                 else 
-                    answer[L"result"] = json::value::string(L"false");
+                    answer[L"result"] = web::json::value::string(L"false");
             }
             else
                 printf("ERROR, status code %u returned.\n", response.status_code());
@@ -403,19 +394,19 @@ bool Server_VersionCheck(const json::value& req_array, web::json::value& answer)
     return true;
 }
 
-bool handle_post(http_request request)
+bool handle_post(web::http::http_request request)
 {
     std::TRACE("\nhandle POST\n");
-    web::json::value answer = json::value::object();
+    web::json::value answer = web::json::value::object();
     bool result = false;
-    json::value request_json;
+    web::json::value request_json;
     try {
         request_json = request.extract_json().get();
         display_json(request_json, L"Client Request : ");
     }
-    catch (json::json_exception& e) {
+    catch (web::json::json_exception& e) {
         std::cout << "Error Msg : " << e.what() << std::endl;
-        request.reply(status_codes::BadRequest, answer);
+        request.reply(web::http::status_codes::BadRequest, answer);
         return false;
     }
     std::wstring data_type = request_json.at(L"DATA_TYPE").as_string();
@@ -432,24 +423,26 @@ bool handle_post(http_request request)
     {
         std::cout << " \n Response 성 공 \n" << std::endl;
         display_json(answer, L"Server-Response : ");
-        request.reply(status_codes::OK, answer);
+        request.reply(web::http::status_codes::OK, answer);
         return true;
     }
     else
     {
-        request.reply(status_codes::BadRequest, answer);
+        request.reply(web::http::status_codes::BadRequest, answer);
         return false;
     }
-}
+} 
+
+
 
 int main()
 {
-    http_listener listener(L"http://127.0.0.1:36259");
+    web::http::experimental::listener::http_listener listener(L"http://127.0.0.1:36259");
 
     listener.open();
-    listener.support(methods::POST, handle_post);
-    listener.support(methods::PUT, handle_put);
-    listener.support(methods::DEL, handle_del);
+    listener.support(web::http::methods::POST, handle_post);
+    listener.support(web::http::methods::PUT, handle_put);
+    listener.support(web::http::methods::DEL, handle_del);
 
     try
     {

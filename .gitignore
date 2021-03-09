@@ -101,6 +101,8 @@ ipch/
 *.cachefile
 *.VC.db
 *.VC.VC.opendb
+Client/Client_class.cpp
+Client/Client_class.h
 
 # Visual Studio profiler
 *.psess

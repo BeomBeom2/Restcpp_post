@@ -1,8 +1,7 @@
 #include <windows.h>
 #include <cpprest/http_client.h>
 #include <cpprest/json.h>
-#include <openssl/sha.h>
-#include <winbase.h>
+#include <openssl/sha.h> 
 #include <atlconv.h>
 #include <openssl/ec.h>
 #include <openssl/ecdh.h>
@@ -18,20 +17,7 @@
 #include <urlmon.h> 
 #pragma comment(lib, "cpprest141_2_10d.lib")
 #pragma comment(lib,"version.lib")
-#pragma comment (lib,"urlmon.lib") 
-
-enum DATA_TYPE { _KEY_CHECK };
-
-static const char* base64_chars[2] = {
-             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-             "abcdefghijklmnopqrstuvwxyz"
-             "0123456789"
-             "+/",
-
-             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-             "abcdefghijklmnopqrstuvwxyz"
-             "0123456789"
-             "-_" };
+#pragma comment (lib,"urlmon.lib")  
 
 void display_json(
     web::json::value const& jvalue,
@@ -90,8 +76,7 @@ void make_request(
                     std::wcout << e.what() << std::endl;
                 }
             })
-                .wait();
-
+                .wait(); 
     return;
 }
 
@@ -107,59 +92,59 @@ void sha256_hash_string(unsigned char hash[SHA256_DIGEST_LENGTH], char outputBuf
     outputBuffer[64] = 0;
 }
 
-bool requestIngerity(web::http::client::http_client& client)
-{
-    auto getHashCheck = web::json::value::array();
-    getHashCheck[0] = web::json::value::string(L"_REQ_CHECK");
-
-    std::wstring path = L"C:\\test.zip";
-    std::ifstream file(path, std::ios::binary | std::ios::in);
-
-    file.seekg(0, std::ios::end);
-    size_t file_size = file.tellg();
-    file.clear();
-    file.seekg(0, std::ios::beg);
-
-    size_t hash_size = 65;
-    static char file_hash[65] = { 0, };
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    const int bufSize = 32768;
-
-    char* buffer = (char*)malloc(bufSize);
-    int bytesRead = 0;
-
-    while (!file.eof())
-    {
-        file.read(buffer, bufSize);
-        SHA256_Update(&sha256, buffer, file.gcount());
-    }
-    SHA256_Final(hash, &sha256);
-    sha256_hash_string(hash, file_hash);
-    file.close();
-
-    /*ANSI to UNICODE*/
-    int lenA = lstrlenA(file_hash); // #include <winbase.h>
-    int lenW;
-    BSTR unicode_hash = NULL; // #include <oleauto.h>
-
-    lenW = ::MultiByteToWideChar(CP_ACP, 0, file_hash, lenA, 0, 0); // #include <stringapiset.h>
-    if (lenW > 0)
-    {
-        // 변환 성공 여부 확인
-        unicode_hash = ::SysAllocStringLen(0, lenW); // #include <oleauto.h>
-        ::MultiByteToWideChar(CP_ACP, 0, file_hash, lenA, unicode_hash, lenW);
-    }
-
-    getHashCheck[1] = web::json::value::string(unicode_hash);
-    display_json(getHashCheck, L"S: ");
-    //make_request(client, methods::POST, getHashCheck, );
-
-    ::SysFreeString(unicode_hash);  // free BSTR #include <oleauto.h>
-    free(buffer);
-    return true;
-}
+//bool requestIngerity(web::http::client::http_client& client)
+//{
+//    auto getHashCheck = web::json::value::array();
+//    getHashCheck[0] = web::json::value::string(L"_REQ_CHECK");
+//
+//    std::wstring path = L"C:\\test.zip";
+//    std::ifstream file(path, std::ios::binary | std::ios::in);
+//
+//    file.seekg(0, std::ios::end);
+//    size_t file_size = file.tellg();
+//    file.clear();
+//    file.seekg(0, std::ios::beg);
+//
+//    size_t hash_size = 65;
+//    static char file_hash[65] = { 0, };
+//    unsigned char hash[SHA256_DIGEST_LENGTH];
+//    SHA256_CTX sha256;
+//    SHA256_Init(&sha256);
+//    const int bufSize = 32768;
+//
+//    char* buffer = (char*)malloc(bufSize);
+//    int bytesRead = 0;
+//
+//    while (!file.eof())
+//    {
+//        file.read(buffer, bufSize);
+//        SHA256_Update(&sha256, buffer, file.gcount());
+//    }
+//    SHA256_Final(hash, &sha256);
+//    sha256_hash_string(hash, file_hash);
+//    file.close();
+//
+//    /*ANSI to UNICODE*/
+//    int lenA = lstrlenA(file_hash); // #include <winbase.h>
+//    int lenW;
+//    BSTR unicode_hash = NULL; // #include <oleauto.h>
+//
+//    lenW = ::MultiByteToWideChar(CP_ACP, 0, file_hash, lenA, 0, 0); // #include <stringapiset.h>
+//    if (lenW > 0)
+//    {
+//        // 변환 성공 여부 확인
+//        unicode_hash = ::SysAllocStringLen(0, lenW); // #include <oleauto.h>
+//        ::MultiByteToWideChar(CP_ACP, 0, file_hash, lenA, unicode_hash, lenW);
+//    }
+//
+//    getHashCheck[1] = web::json::value::string(unicode_hash);
+//    display_json(getHashCheck, L"S: ");
+//    //make_request(client, methods::POST, getHashCheck, );
+//
+//    ::SysFreeString(unicode_hash);  // free BSTR #include <oleauto.h>
+//    free(buffer);
+//    return true;
+//}
 
 /*Nice little macro to save a few lines.*/
 void die(const char* reason)
@@ -187,8 +172,7 @@ EC_KEY* gen_key(void)
 /*Elliptic Curve Diffie-Hellman function*/
 int EC_DH(unsigned char** secret, EC_KEY* key, const EC_POINT* pPub)
 {
-    int secretLen;
-
+    int secretLen; 
     secretLen = EC_GROUP_get_degree(EC_KEY_get0_group(key));
     secretLen = (secretLen + 7) / 8;
 
@@ -201,8 +185,7 @@ int EC_DH(unsigned char** secret, EC_KEY* key, const EC_POINT* pPub)
     //printf("secret key len : %d\n", secretLen);
 
     return secretLen;
-}
-
+} 
 
 static char* sha256_file(const std::wstring path, size_t& packet_size)
 {
@@ -247,124 +230,125 @@ bool downloadFile(const char* buf, const size_t& size, const std::wstring path) 
 
     return true;
 }
-unsigned char* Client_keyExchange(web::http::client::http_client& client, web::json::value& answer)
-{
-    auto key_exchange = web::json::value::object();
-    EC_KEY* Client_Key, * tmpkey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-    int SecretKey_Len;
-    unsigned char* Secret_key = NULL;
-    unsigned char* Client_keyBuf = NULL;
-    unsigned char* Server_keyBuf = NULL;
 
-    /*키 생성*/
-    Client_Key = gen_key();
-    int size = EC_KEY_key2buf(Client_Key, EC_KEY_get_conv_form(Client_Key), &Client_keyBuf, nullptr);
-    
-    /*키를 보내기 위해 인코딩*/
-    std::string Client_keyStr(reinterpret_cast<const char*>(Client_keyBuf));
-    std::string encoded = base64_encode(reinterpret_cast<const unsigned char*>(Client_keyBuf), (size_t)size, false);
-    std::wstring wEncoded;
-    convert_str2wstr(encoded, wEncoded);
-    Client_keyStr.clear();
-    encoded.clear();  
-
-    /*키 길이를 보내기 위한 wstring 변환*/
-    std::string str_size = std::to_string(size);
-    std::wstring wstr_size;
-    wstr_size.assign(str_size.begin(), str_size.end());
-    str_size.clear();
-
-    key_exchange[L"key_data"] = web::json::value::string(wEncoded);
-    key_exchange[L"key_size"] = web::json::value::string(wstr_size);
-    key_exchange[L"DATA_TYPE"] = web::json::value::string(L"_KEY_EXCHANGE");
-    display_json(key_exchange, L"Client-Request : ");
-    wEncoded.clear();
-    wstr_size.clear();
-
-    make_request(client, web::http::methods::POST, key_exchange, &answer);
-
-    /*서버 키 디코딩*/
-    wEncoded = answer.at(L"key_data").as_string();
-    convert_wstr2str(wEncoded, encoded);
-    std::string decoded = base64_decode(encoded, false);
-    Server_keyBuf = (unsigned char*)decoded.c_str();
-    std::cout << "\n Server_keyBuf from Server : " << Server_keyBuf << std::endl;
-    /*서버 키 사이즈 값 변환*/
-    wstr_size = answer.at(L"key_size").as_string();
-    size_t ServerKey_size = _wtoi(wstr_size.c_str());
-
-    /*서버로 부터 가져온 키, 키 길이로 버퍼를 key로 변환*/
-    int size1 = EC_KEY_oct2key(tmpkey, Server_keyBuf, ServerKey_size, nullptr);
-    decoded.clear();
-
-    /*서버 키로 비밀 키 생성*/
-    SecretKey_Len = EC_DH(&Secret_key, Client_Key, EC_KEY_get0_public_key(tmpkey));
-
-    std::cout << std::endl;
-    printf("Client-secret key is : ");
-    for (int i = 0; i < SecretKey_Len; i++)
-        printf(" %c", Secret_key[i]);
-    std::cout << std::endl;
-
-    OPENSSL_free(Client_keyBuf);
-    EC_KEY_free(Client_Key);
-    return Secret_key;
-}
+//unsigned char* Client_keyExchange(web::http::client::http_client& client, web::json::value& answer)
+//{
+//    auto key_exchange = web::json::value::object();
+//    EC_KEY* Client_Key, * tmpkey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+//    int SecretKey_Len;
+//    unsigned char* Secret_key = NULL;
+//    unsigned char* Client_keyBuf = NULL;
+//    unsigned char* Server_keyBuf = NULL;
+//
+//    /*키 생성*/
+//    Client_Key = gen_key();
+//    size_t size = EC_KEY_key2buf(Client_Key, EC_KEY_get_conv_form(Client_Key), &Client_keyBuf, nullptr);
+//    
+//    /*키를 보내기 위해 인코딩*/
+//    std::string Client_keyStr(reinterpret_cast<const char*>(Client_keyBuf));
+//    std::string encoded = base64_encode(reinterpret_cast<const unsigned char*>(Client_keyBuf), size, false);
+//    std::wstring wEncoded;
+//    convert_str2wstr(encoded, wEncoded);
+//    Client_keyStr.clear();
+//    encoded.clear();  
+//
+//    /*키 길이를 보내기 위한 wstring 변환*/
+//    std::string str_size = std::to_string(size);
+//    std::wstring wstr_size;
+//    wstr_size.assign(str_size.begin(), str_size.end());
+//    str_size.clear();
+//
+//    key_exchange[L"key_data"] = web::json::value::string(wEncoded);
+//    key_exchange[L"key_size"] = web::json::value::string(wstr_size);
+//    key_exchange[L"DATA_TYPE"] = web::json::value::string(L"_KEY_EXCHANGE");
+//    display_json(key_exchange, L"Client-Request : ");
+//    wEncoded.clear();
+//    wstr_size.clear();
+//
+//    make_request(client, web::http::methods::POST, key_exchange, &answer);
+//
+//    /*서버 키 디코딩*/
+//    wEncoded = answer.at(L"key_data").as_string();
+//    convert_wstr2str(wEncoded, encoded);
+//    std::string decoded = base64_decode(encoded, false);
+//    Server_keyBuf = (unsigned char*)decoded.c_str();
+//    std::cout << "\n Server_keyBuf from Server : " << Server_keyBuf << std::endl;
+//    /*서버 키 사이즈 값 변환*/
+//    wstr_size = answer.at(L"key_size").as_string();
+//    size_t ServerKey_size = _wtoi(wstr_size.c_str());
+//
+//    /*서버로 부터 가져온 키, 키 길이로 버퍼를 key로 변환*/
+//    int size1 = EC_KEY_oct2key(tmpkey, Server_keyBuf, ServerKey_size, nullptr);
+//    decoded.clear();
+//
+//    /*서버 키로 비밀 키 생성*/
+//    SecretKey_Len = EC_DH(&Secret_key, Client_Key, EC_KEY_get0_public_key(tmpkey));
+//
+//    std::cout << std::endl;
+//    printf("Client-secret key is : ");
+//    for (int i = 0; i < SecretKey_Len; i++)
+//        printf(" %c", Secret_key[i]);
+//    std::cout << std::endl;
+//
+//    OPENSSL_free(Client_keyBuf);
+//    EC_KEY_free(Client_Key);
+//    return Secret_key;
+//}
 
 /*서버와 키 교환*/
-bool Client_FileCheck(web::http::client::http_client& client)
-{
-    /*비밀 키 생성*/
-    web::json::value answer;
-    unsigned char* Secret_key = Client_keyExchange(client, answer);
-
-    /*파일 데이터 디코딩*/
-    std::wstring wEncoded = answer.at(L"zip_data").as_string();
-    std::string encoded;
-    encoded.assign(wEncoded.begin(), wEncoded.end());
-    std::string decoded = base64_decode(encoded, false);
-    const char* zip_data = decoded.c_str();
-    wEncoded.clear();
-    encoded.clear();
-
-    /*파일 크기 디코딩, 파일 다운*/
-    std::wstring wstr_size = answer.at(L"zip_size").as_string();
-    size_t zip_size = _wtoi(wstr_size.c_str());
-    std::wstring filePath = L"C:\\Client_downFIle\\pwtest.zip";
-    downloadFile(zip_data, zip_size, filePath);
-    decoded.clear();
-    wstr_size.clear();
-
-    /*해시 생성*/
-    size_t hash_packet_size = 0; 
-    const char* hash_data = sha256_file(filePath, hash_packet_size);
-    std::wstring wHash_data(&hash_data[0], &hash_data[hash_packet_size - 1]);
-
-    /*서버 해시 값 가져오기*/
-    std::wstring whash_size = answer.at(L"hash_size").as_string();
-    size_t hash_size = _wtoi(whash_size.c_str());
-
-    if (hash_packet_size != hash_size)
-    {
-        std::cout << "파일 해시 값 길이 다름" << std::endl;
-        return false;
-    }
-    std::wstring server_hash_data = answer.at(L"hash_data").as_string();
-
-    /*파일 해시가 일치 할 경우*/
-    if (!wcscmp(server_hash_data.c_str(), wHash_data.c_str()))
-    {
-        std::cout << "파일 해시 일치" << std::endl;
-        UnzipCTL ctl("C:\\Client_downFIle\\pwtest.zip"); //파일 위치
-        ctl.extractall("C:\\Client_downFIle", reinterpret_cast<const char*>(Secret_key)); //압축을 풀 폴더 경로
-    }
-    else
-        std::cout << "파일 변조" << std::endl;
-    
-    free(Secret_key);
-    CRYPTO_cleanup_all_ex_data();
-    return 0;
-}
+//bool Client_FileCheck(web::http::client::http_client& client)
+//{
+//    /*비밀 키 생성*/
+//    web::json::value answer;
+//    unsigned char* Secret_key = Client_keyExchange(client, answer);
+//
+//    /*파일 데이터 디코딩*/
+//    std::wstring wEncoded = answer.at(L"zip_data").as_string();
+//    std::string encoded;
+//    encoded.assign(wEncoded.begin(), wEncoded.end());
+//    std::string decoded = base64_decode(encoded, false);
+//    const char* zip_data = decoded.c_str();
+//    wEncoded.clear();
+//    encoded.clear();
+//
+//    /*파일 크기 디코딩, 파일 다운*/
+//    std::wstring wstr_size = answer.at(L"zip_size").as_string();
+//    size_t zip_size = _wtoi(wstr_size.c_str());
+//    std::wstring filePath = L"C:\\Client_downFIle\\pwtest.zip";
+//    downloadFile(zip_data, zip_size, filePath);
+//    decoded.clear();
+//    wstr_size.clear();
+//
+//    /*해시 생성*/
+//    size_t hash_packet_size = 0; 
+//    const char* hash_data = sha256_file(filePath, hash_packet_size);
+//    std::wstring wHash_data(&hash_data[0], &hash_data[hash_packet_size - 1]);
+//
+//    /*서버 해시 값 가져오기*/
+//    std::wstring whash_size = answer.at(L"hash_size").as_string();
+//    size_t hash_size = _wtoi(whash_size.c_str());
+//
+//    if (hash_packet_size != hash_size)
+//    {
+//        std::cout << "파일 해시 값 길이 다름" << std::endl;
+//        return false;
+//    }
+//    std::wstring server_hash_data = answer.at(L"hash_data").as_string();
+//
+//    /*파일 해시가 일치 할 경우*/
+//    if (!wcscmp(server_hash_data.c_str(), wHash_data.c_str()))
+//    {
+//        std::cout << "파일 해시 일치" << std::endl;
+//        UnzipCTL ctl("C:\\Client_downFIle\\pwtest.zip"); //파일 위치
+//        ctl.extractall("C:\\Client_downFIle", reinterpret_cast<const char*>(Secret_key)); //압축을 풀 폴더 경로
+//    }
+//    else
+//        std::cout << "파일 변조" << std::endl;
+//    
+//    free(Secret_key);
+//    CRYPTO_cleanup_all_ex_data();
+//    return 0;
+//}
 
 std::wstring file_version()
 {
@@ -407,7 +391,25 @@ std::wstring file_version()
         } 
     }
     return wVersion;
-}
+} 
+
+/*경로 내에 없는 폴더 생성*/
+void MakeSubFolder(LPCTSTR path)
+{
+    if (!SetCurrentDirectory(path)) {
+        TCHAR tmpPath[MAX_PATH];
+        memset(tmpPath, 0, MAX_PATH);
+        _tcscpy(tmpPath, path);
+
+        LPTSTR rPt = _tcsrchr(tmpPath, '\\');
+
+        if (rPt) {
+            *rPt = 0;
+            MakeSubFolder(tmpPath);
+        }
+        CreateDirectory(path, NULL);
+    }
+} 
 
 bool VersionCheck()
 {
@@ -434,8 +436,7 @@ bool VersionCheck()
             info[L"file_name"] = array[0][L"name"];
 
             /*폴더 생성*/
-            if ((_waccess(wfolder_Path.c_str(), 0)) == -1)
-                CreateDirectory(wfolder_Path.c_str(), NULL);
+            MakeSubFolder(wfolder_Path.c_str());
 
             wfolder_Path += L"\\" + info[L"file_name"].as_string(); 
 
@@ -452,7 +453,7 @@ bool VersionCheck()
                 std::cout << "hash search error" << std::endl;
                 info[L"file_hash"] = web::json::value(L"hash load error");
             }
-
+            
             std::wcout << L"Client version is : " << L"\"" << Client_version << L"\"" << std::endl;
             std::wcout << L"Server version is : " << info[L"server_ver"] << std::endl;
 
@@ -480,7 +481,7 @@ bool VersionCheck()
                 if (!_strcmpi(Client_hash.c_str(), Server_hash.c_str()))
                 {
                     std::cout << "파일 해시 일치" << std::endl;
-                    HINSTANCE result = ::ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
+                    HINSTANCE result = ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
                 }
                 else
                 {
@@ -496,7 +497,7 @@ bool VersionCheck()
                     if (!wcscmp(wHash_data.c_str(), info[L"file_hash"].as_string().c_str()))
                     {
                         std::cout << "파일 해시 일치" << std::endl;
-                        HINSTANCE result = ::ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
+                        HINSTANCE result = ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
                     }
                     else
                         /*두번 째도 해시가 불일치할 경우*/
@@ -505,17 +506,16 @@ bool VersionCheck()
             }
         }
         else
-        {
-            printf("REQ ERROR, status code %u. \n", response.status_code());
+        { 
+            std::cerr << "REQ ERROR, status code " << response.status_code() << std::endl;
         }
     }).wait(); 
     return true;
-}
+} 
 
 int main()
 {
-    web::http::client::http_client client(U("http://127.0.0.1:36259"));
-    VersionCheck();
-    //update_check(client);
-    //Client_FileCheck(client);
+    //web::http::client::http_client client(U("http://127.0.0.1:36259"));
+    VersionCheck(); 
+    //Client_FileCheck(client); 
 }
