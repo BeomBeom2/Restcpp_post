@@ -102,6 +102,12 @@
     <ClCompile Include="Client_class.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Desktop\Restcpp_post-master (1)\Restcpp_post-master\Client\zlib\minitest.cpp">
+      <Filter>zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Desktop\Restcpp_post-master (1)\Restcpp_post-master\Client\zlib\miniunz.c">
+      <Filter>zlib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\source\repos\base64_test\base64_test\base64.h">

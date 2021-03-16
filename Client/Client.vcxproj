@@ -147,6 +147,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\Desktop\Restcpp_post-master (1)\Restcpp_post-master\Client\zlib\minitest.cpp" />
+    <ClCompile Include="..\..\..\..\Desktop\Restcpp_post-master (1)\Restcpp_post-master\Client\zlib\miniunz.c" />
     <ClCompile Include="base64.cpp" />
     <ClCompile Include="Client.cpp" />
     <ClCompile Include="Client_class.cpp" />
