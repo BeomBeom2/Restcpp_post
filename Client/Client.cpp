@@ -3,7 +3,7 @@
 #include <cpprest/json.h>
 #include <openssl/sha.h> 
 #include <atlconv.h>
-#include <openssl/ec.h>
+#include <openssl/ec.h> 
 #include <openssl/ecdh.h>
 /*NID_X9_62_prime256v1*/
 #include <openssl/evp.h>
@@ -76,8 +76,8 @@ void make_request(
                     std::wcout << e.what() << std::endl;
                 }
             })
-                .wait(); 
-    return;
+                .wait();
+            return;
 }
 
 void sha256_hash_string(unsigned char hash[SHA256_DIGEST_LENGTH], char outputBuffer[65])
@@ -172,7 +172,7 @@ EC_KEY* gen_key(void)
 /*Elliptic Curve Diffie-Hellman function*/
 int EC_DH(unsigned char** secret, EC_KEY* key, const EC_POINT* pPub)
 {
-    int secretLen; 
+    int secretLen;
     secretLen = EC_GROUP_get_degree(EC_KEY_get0_group(key));
     secretLen = (secretLen + 7) / 8;
 
@@ -185,9 +185,9 @@ int EC_DH(unsigned char** secret, EC_KEY* key, const EC_POINT* pPub)
     //printf("secret key len : %d\n", secretLen);
 
     return secretLen;
-} 
+}
 
-static char* sha256_file(const std::wstring path, size_t& packet_size)
+static char* sha256_file(const std::wstring path, size_t& packet_size, char* file_hash)
 {
     std::ifstream file(path, std::ios::binary | std::ios::in);
     file.seekg(0, std::ios::end);
@@ -195,7 +195,6 @@ static char* sha256_file(const std::wstring path, size_t& packet_size)
     file.clear();
     file.seekg(0, std::ios::beg);
 
-    static char file_hash[65] = { 0, };
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256_CTX sha256;
     SHA256_Init(&sha256);
@@ -365,8 +364,8 @@ std::wstring file_version()
     infoSize = GetFileVersionInfoSize(name.c_str(), 0);
     if (infoSize != 0)
     {
-    // 버퍼할당
-    buffer = new char[infoSize];
+        // 버퍼할당
+        buffer = new char[infoSize];
         if (buffer)
         {
             // 버전정보데이터를 가져옵니다.
@@ -384,138 +383,213 @@ std::wstring file_version()
                     revisionNum = LOWORD(pFineInfo->dwFileVersionLS);
 
                     wVersion = std::to_wstring(majorVer) + L"." + std::to_wstring(minorVer) +
-                                L"." + std::to_wstring(buildNum) + L"." + std::to_wstring(revisionNum);
+                        L"." + std::to_wstring(buildNum) + L"." + std::to_wstring(revisionNum);
                 }
             }
             delete[] buffer;
-        } 
+        }
     }
     return wVersion;
-} 
+}
 
 /*경로 내에 없는 폴더 생성*/
-void MakeSubFolder(LPCTSTR path)
+//void MakeSubFolder(LPCTSTR path)
+//{
+//    if (!SetCurrentDirectory(path)) {
+//        TCHAR tmpPath[MAX_PATH];
+//        memset(tmpPath, 0, MAX_PATH);
+//        _tcscpy(tmpPath, path);
+//
+//        LPTSTR rPt = _tcsrchr(tmpPath, '\\');
+//
+//        if (rPt) {
+//            *rPt = 0;
+//            MakeSubFolder(tmpPath);
+//        }
+//        CreateDirectory(path, NULL);
+//    }
+//} 
+
+int  Unzip(const char* path)
 {
-    if (!SetCurrentDirectory(path)) {
-        TCHAR tmpPath[MAX_PATH];
-        memset(tmpPath, 0, MAX_PATH);
-        _tcscpy(tmpPath, path);
+    do {
+        unzFile uf = unzOpen(path);
+        if (NULL == uf) break;
 
-        LPTSTR rPt = _tcsrchr(tmpPath, '\\');
-
-        if (rPt) {
-            *rPt = 0;
-            MakeSubFolder(tmpPath);
+        int ret = unzGoToFirstFile(uf);
+        if (UNZ_OK != ret) {
+            unzClose(uf);
+            break;
         }
-        CreateDirectory(path, NULL);
-    }
-} 
+
+        /// 현재  방문중인  파일  목록  정보  추출   
+        const  int MAX_COMMENT = 256;
+
+        char filename[MAX_PATH];
+        char comment[MAX_COMMENT];
+
+        unz_file_info info;
+        unzGetCurrentFileInfo(uf, &info, filename, MAX_PATH, NULL, 0, comment, MAX_COMMENT);
+
+        std::cout << "filename:" << filename << " Comment:" << comment << std::endl;
+        std::cout << " compressed_size:" << info.compressed_size << " uncompressed_size:" << info.uncompressed_size << std::endl;
+
+
+        //현재  파일을  열기.
+        ret = unzOpenCurrentFile(uf);
+
+        const  int BUF = 1024;
+        Bytef in[BUF];
+        int readsize(0);
+
+        std::ofstream op;
+        op.open(filename, std::ios_base::binary);
+
+        do {
+            readsize = unzReadCurrentFile(uf, (void*)in, BUF);
+            op.write((const  char*)in, readsize);
+
+        } while (0 != readsize);
+
+        op.close();
+
+        unzCloseCurrentFile(uf);
+
+        /////
+        unzClose(uf);
+
+    } while (false);
+
+    system("pause");
+
+    return 0;
+}
 
 bool VersionCheck()
 {
-    std::wstring&& Client_version =  L"v1.3.0" /*file_version()*/;
+    std::wstring&& Client_version = L"v1.3.0" /*file_version()*/;
     web::json::value info;
-    web::json::value Client_fileVer = web::json::value::object();
-    web::http::uri_builder uri(L"https://api.github.com/repos/BeomBeom2/Zabbix/releases/latest");
+    std::wstring access_token = L"?ref=master&access_token=912b6197c5734eb476c87b0ad86d602b55f07ba4";
+    web::http::uri_builder uri(L"https://api.github.com/repos/BeomBeom2/Private_test/releases/latest?ref=master&access_token=912b6197c5734eb476c87b0ad86d602b55f07ba4");
     auto addr = uri.to_string();
     web::http::client::http_client* github = new web::http::client::http_client(U("https://api.github.com/"));
     web::json::value latest_info;
     std::wstring latest_body;
-    std::wstring wfolder_Path = L"C:\\Unzip"; 
+    bool Needed_download = false;
 
     github->request(web::http::methods::GET, addr).then([&](web::http::http_response response)
-    {
-        if (response.status_code() == web::http::status_codes::OK)
         {
-            /*response에서 버전정보, 설치파일 url, release body, 설치파일 이름 parse*/
-            latest_info = response.extract_json().get();
-            info[L"server_ver"] = latest_info.at(L"tag_name");
-            latest_body = latest_info[L"body"].as_string();
-            auto array = latest_info[L"assets"].as_array();
-            info[L"file_url"] = array[0][L"browser_download_url"];
-            info[L"file_name"] = array[0][L"name"];
-
-            /*폴더 생성*/
-            MakeSubFolder(wfolder_Path.c_str());
-
-            wfolder_Path += L"\\" + info[L"file_name"].as_string(); 
-
-            /*release body에서 hash값 parse */
-            size_t index = latest_body.find(L"hash"); 
-            if (index != std::wstring::npos)
+            if (response.status_code() == web::http::status_codes::OK)
             {
-                std::wstring hash_str = latest_body.substr(index);
-                info[L"file_hash"] = web::json::value(hash_str.substr(hash_str.find(L"\"") + 1, 64));
-                display_json(info[L"file_hash"], L"Server hash : ");
-            }
-            else
-            {
-                std::cout << "hash search error" << std::endl;
-                info[L"file_hash"] = web::json::value(L"hash load error");
-            }
-            
-            std::wcout << L"Client version is : " << L"\"" << Client_version << L"\"" << std::endl;
-            std::wcout << L"Server version is : " << info[L"server_ver"] << std::endl;
+                /*response에서 버전정보, 설치파일 url, release body, 설치파일 이름 parse*/
+                latest_info = response.extract_json().get();
+                info[L"server_ver"] = latest_info.at(L"tag_name");
+                info[L"zipball_url"] = latest_info.at(L"zipball_url");
+                info[L"zip_name"] = latest_info[L"name"];
+                latest_body = latest_info[L"body"].as_string();
+                auto array = latest_info[L"assets"].as_array();
+                //info[L"file_url"] = array[0][L"browser_download_url"];
 
-            /*현재 파일 버전이 서버 버전과 일치 할 경우(최신 버전일 경우)*/
-            if (!wcscmp(Client_version.c_str(), info[L"server_ver"].as_string().c_str()))
-            {
-                std::cout << "current version is latest version!" << std::endl;
-            }
-            else
-            {
-                std::cout << "current version is not latest version\n download file!" << std::endl;
-
-                /*URL 바이너리 다운로드*/
-                HRESULT hr = URLDownloadToFile(NULL, info[L"file_url"].as_string().c_str(),
-                    wfolder_Path.c_str(), 0, NULL);
-
-                /*설치파일 해시 생성*/
-                size_t hash_packet_size = 0;
-                const char* hash_data = sha256_file(wfolder_Path, hash_packet_size);
-                std::string Client_hash(&hash_data[0], &hash_data[hash_packet_size - 1]); 
-
-                std::string Server_hash;
-                convert_wstr2str(info[L"file_hash"].as_string(), Server_hash);
-
-                if (!_strcmpi(Client_hash.c_str(), Server_hash.c_str()))
+                /*release body에서 hash값 parse */
+                size_t index = latest_body.find(L"hash");
+                if (index != std::wstring::npos)
                 {
-                    std::cout << "파일 해시 일치" << std::endl;
-                    HINSTANCE result = ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
+                    std::wstring hash_str = latest_body.substr(index);
+                    info[L"file_hash"] = web::json::value(hash_str.substr(hash_str.find(L"\"") + 1, 64));
+                    display_json(info[L"file_hash"], L"Server hash : ");
                 }
                 else
                 {
-                    /*파일 해시가 불 일치할 경우 파일 재 다운로드 및 해시 검사*/
-                    std::cout << "파일 해시 불 일치 \n다운로드 재시작" << std::endl;
-                    HRESULT hr = URLDownloadToFile(NULL, info[L"file_hash"].as_string().c_str(),
-                        wfolder_Path.c_str(), 0, NULL);
-
-                    size_t hash_packet_size = 0;
-                    const char* hash_data = sha256_file(wfolder_Path, hash_packet_size);
-                    std::wstring wHash_data(&hash_data[0], &hash_data[hash_packet_size - 1]);
-                    
-                    if (!wcscmp(wHash_data.c_str(), info[L"file_hash"].as_string().c_str()))
-                    {
-                        std::cout << "파일 해시 일치" << std::endl;
-                        HINSTANCE result = ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
-                    }
-                    else
-                        /*두번 째도 해시가 불일치할 경우*/
-                        std::cout << "관리자에게 문의" << std::endl;
+                    std::cout << "hash search error" << std::endl;
+                    info[L"file_hash"] = web::json::value(L"hash load error");
                 }
+
+                std::wcout << L"Client version is : " << L"\"" << Client_version << L"\"" << std::endl;
+                std::wcout << L"Server version is : " << info[L"server_ver"] << std::endl;
+
+                /*현재 파일 버전이 서버 버전과 일치 할 경우(최신 버전일 경우)*/
+                if (!wcscmp(Client_version.c_str(), info[L"server_ver"].as_string().c_str()))
+                {
+                    std::cout << "current version is latest version!" << std::endl;
+                }
+                else
+                    Needed_download = true;
             }
+            else
+            {
+                std::cerr << "REQ ERROR, status code " << response.status_code() << std::endl;
+            }
+        }).wait();
+
+
+        /*최신 설치파일이 필요한 경우*/
+        if (Needed_download)
+        {
+            std::wstring zip_url = info[L"zipball_url"].as_string();
+            zip_url += access_token;
+            github->request(web::http::methods::GET, zip_url).then([&](web::http::http_response response)
+                {
+                    if (response.status_code() == web::http::status_codes::OK)
+                    {
+                        /*zipball 데이터 가져오기*/
+                        std::string zip_data = response.extract_utf8string(true).get();
+                        size_t size = zip_data.size();
+
+                        const char* temp_path = getenv("TEMP");
+                        size_t length = strlen(temp_path);
+
+                        std::cout << temp_path << std::endl;
+
+                        std::wstring wTemp_path(length, L'#');
+
+                        //#pragma warning (disable : 4996)
+                        // Or add to the preprocessor: _CRT_SECURE_NO_WARNINGS
+                        mbstowcs(&wTemp_path[0], temp_path, length);
+
+                        //std::wstring wfolder_Path = L"C:\\Users\\mslm01\\Downloads\\"; 
+
+                        //if ((_waccess(wfolder_Path.c_str(), 0)) == -1)
+                        //	CreateDirectory(wfolder_Path.c_str(), NULL);
+                        wTemp_path += L"\\MSLM_Ver_";
+                        wTemp_path += info[L"server_ver"].as_string();
+
+                        std::cout << "current version is not latest version\n download file!" << std::endl;
+
+                        /*zip파일 다운로드*/
+                        downloadFile(zip_data.c_str(), size, wTemp_path + L".zip");
+
+
+
+
+                        /*설치파일 해시 생성*/
+                        size_t hash_packet_size = 0;
+                        char Client_hash[65];
+                        const char* hash_data = sha256_file(wTemp_path, hash_packet_size, Client_hash);
+
+                        std::string Server_hash;
+                        convert_wstr2str(info[L"file_hash"].as_string(), Server_hash);
+
+                        if (!_strcmpi(Client_hash, Server_hash.c_str()))
+                        {
+                            std::cout << "파일 해시 일치" << std::endl;
+                            //HINSTANCE result = ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
+                        }
+                        else
+                        {
+                            /*파일 해시가 불 일치할 경우 파일 재 다운로드 및 해시 검사*/
+                            std::cout << "파일 해시 불 일치 \n다운로드 재시작" << std::endl;
+
+                        }
+                    }
+                }).wait();
         }
-        else
-        { 
-            std::cerr << "REQ ERROR, status code " << response.status_code() << std::endl;
-        }
-    }).wait(); 
-    return true;
-} 
+        return true;
+}
 
 int main()
 {
     //web::http::client::http_client client(U("http://127.0.0.1:36259"));
-    VersionCheck(); 
-    //Client_FileCheck(client); 
+    VersionCheck();
+    //Client_FileCheck(client);    
+    return 0;
 }
