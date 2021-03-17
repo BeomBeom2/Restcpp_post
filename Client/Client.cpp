@@ -13,6 +13,7 @@
 #include "base64.h"
 #include <TCHAR.h>
 #include  "zlib/UnZipCTL.h"
+# include <direct.h>
 #include "zlib/FolderList.h"
 #include <urlmon.h> 
 #pragma comment(lib, "cpprest141_2_10d.lib")
@@ -145,6 +146,57 @@ void sha256_hash_string(unsigned char hash[SHA256_DIGEST_LENGTH], char outputBuf
 //    free(buffer);
 //    return true;
 //}
+
+int mymkdir(const char* dirname)
+{
+    int ret = 0;
+#ifdef _WIN32
+    ret = _mkdir(dirname);
+#elif unix
+    ret = mkdir(dirname, 0775);
+#elif __APPLE__
+    ret = mkdir(dirname, 0775);
+#endif
+    return ret;
+}
+
+/* change_file_date : change the date/time of a file
+    filename : the filename of the file where date/time must be modified
+    dosdate : the new date at the MSDos format (4 bytes)
+    tmu_date : the SAME new date at the tm_unz format */
+void change_file_date(const char* filename, uLong dosdate, tm_unz tmu_date)
+{
+#ifdef _WIN32
+    HANDLE hFile;
+    FILETIME ftm, ftLocal, ftCreate, ftLastAcc, ftLastWrite;
+
+    hFile = CreateFileA(filename, GENERIC_READ | GENERIC_WRITE,
+        0, NULL, OPEN_EXISTING, 0, NULL);
+    GetFileTime(hFile, &ftCreate, &ftLastAcc, &ftLastWrite);
+    DosDateTimeToFileTime((WORD)(dosdate >> 16), (WORD)dosdate, &ftLocal);
+    LocalFileTimeToFileTime(&ftLocal, &ftm);
+    SetFileTime(hFile, &ftm, &ftLastAcc, &ftm);
+    CloseHandle(hFile);
+#else
+#ifdef unix || __APPLE__
+    struct utimbuf ut;
+    struct tm newdate;
+    newdate.tm_sec = tmu_date.tm_sec;
+    newdate.tm_min = tmu_date.tm_min;
+    newdate.tm_hour = tmu_date.tm_hour;
+    newdate.tm_mday = tmu_date.tm_mday;
+    newdate.tm_mon = tmu_date.tm_mon;
+    if (tmu_date.tm_year > 1900)
+        newdate.tm_year = tmu_date.tm_year - 1900;
+    else
+        newdate.tm_year = tmu_date.tm_year;
+    newdate.tm_isdst = -1;
+
+    ut.actime = ut.modtime = mktime(&newdate);
+    utime(filename, &ut);
+#endif
+#endif
+}
 
 /*Nice little macro to save a few lines.*/
 void die(const char* reason)
@@ -410,71 +462,237 @@ std::wstring file_version()
 //    }
 //} 
 
-int  Unzip(const char* path)
+/*최하위 폴더까지 생성*/
+int mkdirs(const char* path)
 {
-    do {
-        unzFile uf = unzOpen(path);
-        if (NULL == uf) break;
+    char tmp_path[1024];
+    const char* tmp = path;
+    int len = 0; int ret;
+    if (path == NULL || strlen(path) >= 1024)
+    {
+        return -1;
+    }
+    /* 상위 디렉토리가 존재하는 지 검사하여, 미존재 시에 상위 디렉토리를 생성함 */
+    while ((tmp = strchr(tmp, '/')) != NULL)
+    {
+        len = tmp - path;
+        tmp++;
+        if (len == 0)
+        {
+            continue;
+        }
+        strncpy(tmp_path, path, len);
+        tmp_path[len] = 0x00;
+        if ((ret = mymkdir(tmp_path)) == -1)
+        {
+            if (errno != EEXIST)
+                return -1;
+        }
+    }
+    if (mymkdir(path) == -1)
+    {
+        if (errno != EEXIST)
+            return -1;
+    }
+    return 0;
+}
 
-        int ret = unzGoToFirstFile(uf);
-        if (UNZ_OK != ret) {
-            unzClose(uf);
-            break;
+int do_extract_currentfile(unzFile uf, std::wstring& execute_filepath)
+{
+    char filename_inzip[256];
+    char* filename_withoutpath;
+    char* p;
+    int err = UNZ_OK;
+    FILE* fout = NULL;
+    void* buf;
+    uInt size_buf = 8192;
+    unz_file_info64 file_info;
+
+    /*uf(unzFile)에 선택된 파일 정보 가져오기*/
+    err = unzGetCurrentFileInfo64(uf, &file_info, filename_inzip, sizeof(filename_inzip), NULL, 0, NULL, 0);
+
+    if (err != UNZ_OK)
+    {
+        printf("Current file cannot open, error code : %d\n", err);
+        return err;
+    }
+
+    /*파일 전체 경로*/
+    char* file_fullpath = getenv("TEMP");
+    int env_size = strlen(getenv("TEMP"));
+    strcat(file_fullpath, "\\");
+    strcat(file_fullpath, filename_inzip);
+
+    /*write할 버퍼*/
+    buf = (void*)malloc(size_buf);
+    if (buf == NULL)
+    {
+        printf("Allocating memory error\n");
+        return UNZ_INTERNALERROR;
+    }
+
+    /*해당 경로 끝이 폴더인지 파일인지 탐색 후 파일일 경우 파일 자르기*/
+    p = filename_withoutpath = filename_inzip;
+    while ((*p) != '\0')
+    {
+        if (((*p) == '/') || ((*p) == '\\'))
+            filename_withoutpath = p + 1;
+        p++;
+    }
+
+    /*경로 끝이 폴더일 경우*/
+    if ((*filename_withoutpath) == '\0')
+    {
+        printf("Create Path: %s\n", file_fullpath);
+        mkdirs(file_fullpath);
+    }
+    /*경로 끝이 파일일 경우 */
+    else
+    {
+        /*해당 파일이 setup파일인지 검색*/
+        std::wstring filename(&filename_withoutpath[0], &filename_withoutpath[strlen(filename_withoutpath)]);
+        size_t index = filename.find(L"Setup");
+
+        /*setup파일일 경우*/
+        if (index != std::wstring::npos)
+        {
+            std::wstring excute_path(&file_fullpath[0], &file_fullpath[strlen(file_fullpath)]);
+            execute_filepath = excute_path;
         }
 
-        /// 현재  방문중인  파일  목록  정보  추출   
-        const  int MAX_COMMENT = 256;
+        err = unzOpenCurrentFilePassword(uf, NULL);
+        if (err != UNZ_OK)
+        {
+            printf("CurrentFilePassword cannot open, error code %d\n", err);
+        }
 
-        char filename[MAX_PATH];
-        char comment[MAX_COMMENT];
+        if (err == UNZ_OK)
+        {
+            //해당 경로 끝이 파일인 경우, 파일의 상위 폴더까지 생성 후 파일 write
+            char c = *(file_fullpath + strlen(file_fullpath) - 1 - strlen(filename_withoutpath));
+            *(file_fullpath + strlen(file_fullpath) - 1 - strlen(filename_withoutpath)) = '\0';
+            mkdirs(file_fullpath);
+            *(file_fullpath + strlen(file_fullpath)) = c;
+            fout = fopen64(file_fullpath, "wb");
 
-        unz_file_info info;
-        unzGetCurrentFileInfo(uf, &info, filename, MAX_PATH, NULL, 0, comment, MAX_COMMENT);
+            if (fout == NULL)
+                printf("open error, path is %s\n", file_fullpath);
+        }
 
-        std::cout << "filename:" << filename << " Comment:" << comment << std::endl;
-        std::cout << " compressed_size:" << info.compressed_size << " uncompressed_size:" << info.uncompressed_size << std::endl;
+        if (fout != NULL)
+        {
+            printf(" extracting file: %s\n", filename_withoutpath);
 
+            /*해당 파일 write*/
+            do
+            {
+                err = unzReadCurrentFile(uf, buf, size_buf);
+                if (err < 0)
+                {
+                    printf("error %d with zipfile in unzReadCurrentFile\n", err);
+                    break;
+                }
+                if (err > 0)
+                    if (fwrite(buf, err, 1, fout) != 1)
+                    {
+                        printf("writing extracted file error\n");
+                        err = UNZ_ERRNO;
+                        break;
+                    }
+            } while (err > 0);
+            if (fout)
+                fclose(fout);
 
-        //현재  파일을  열기.
-        ret = unzOpenCurrentFile(uf);
+            if (err == 0)
+                /*파일 날짜, 시간 변경*/
+                change_file_date(&file_fullpath[0], file_info.dosDate,
+                    file_info.tmu_date);
+        }
+        if (err == UNZ_OK)
+        {
+            err = unzCloseCurrentFile(uf);
+            if (err != UNZ_OK)
+            {
+                printf("error %d with zipfile in unzCloseCurrentFile\n", err);
+            }
+        }
+        else
+            unzCloseCurrentFile(uf);
+    }
+    memset(&file_fullpath[env_size], 0, strlen(filename_inzip + 1));
+    free(buf);
+    return err;
+}
 
-        const  int BUF = 1024;
-        Bytef in[BUF];
-        int readsize(0);
+int do_extract(unzFile uf, std::wstring& execute_filepath)
+{
+    uLong i;
+    unz_global_info64 unz_info;
+    int err;
+    FILE* fout = NULL;
+    err = unzGetGlobalInfo64(uf, &unz_info);
+    if (err != UNZ_OK)
+        printf("zipfile in unzGetGlobalInfo request error, code : %d\n", err);
 
-        std::ofstream op;
-        op.open(filename, std::ios_base::binary);
+    for (i = 0; i < unz_info.number_entry; i++)
+    {
+        if (do_extract_currentfile(uf, execute_filepath) != UNZ_OK)
+            break;
 
-        do {
-            readsize = unzReadCurrentFile(uf, (void*)in, BUF);
-            op.write((const  char*)in, readsize);
-
-        } while (0 != readsize);
-
-        op.close();
-
-        unzCloseCurrentFile(uf);
-
-        /////
-        unzClose(uf);
-
-    } while (false);
-
-    system("pause");
-
+        if ((i + 1) < unz_info.number_entry)
+        {
+            err = unzGoToNextFile(uf);
+            if (err != UNZ_OK)
+            {
+                printf("Next file cannot open, error code %d\n", err);
+                break;
+            }
+        }
+    }
     return 0;
+}
+
+
+int Unzip(const char* zipfilename, std::wstring& execute_filepath)
+{
+    int ret_value = 0;
+    unzFile uf = NULL;
+
+#        ifdef USEWIN32IOAPI
+    zlib_filefunc64_def ffunc;
+#        endif
+
+#        ifdef USEWIN32IOAPI
+    fill_win32_filefunc64A(&ffunc);
+    uf = unzOpen2_64(zipfilename, &ffunc);
+#        else
+    uf = unzOpen64(zipfilename);
+#        endif 
+
+    if (uf == NULL)
+    {
+        printf("Cannot open %s\n", zipfilename);
+        return 1;
+    }
+    printf("%s opened\n", zipfilename);
+
+    ret_value = do_extract(uf, execute_filepath);
+    unzClose(uf);
+
+    return ret_value;
 }
 
 bool VersionCheck()
 {
     std::wstring&& Client_version = L"v1.3.0" /*file_version()*/;
     web::json::value info;
-    std::wstring access_token = L"?ref=master&access_token=912b6197c5734eb476c87b0ad86d602b55f07ba4";
-    web::http::uri_builder uri(L"https://api.github.com/repos/BeomBeom2/Private_test/releases/latest?ref=master&access_token=912b6197c5734eb476c87b0ad86d602b55f07ba4");
+    std::wstring access_token = L"?ref=master&access_token=d7602348c431078347b314d78d795a9384d3366b";
+    web::http::uri_builder uri(L"https://api.github.com/repos/BeomBeom2/Private_test/releases/latest?ref=master&access_token=d7602348c431078347b314d78d795a9384d3366b");
     auto addr = uri.to_string();
     web::http::client::http_client* github = new web::http::client::http_client(U("https://api.github.com/"));
     web::json::value latest_info;
     std::wstring latest_body;
+    std::wstring execute_filepath;
     bool Needed_download = false;
 
     github->request(web::http::methods::GET, addr).then([&](web::http::http_response response)
@@ -517,7 +735,7 @@ bool VersionCheck()
             }
             else
             {
-                std::cerr << "REQ ERROR, status code " << response.status_code() << std::endl;
+                std::cerr << "REQ ERROR, status code : " << response.status_code() << std::endl;
             }
         }).wait();
 
@@ -538,33 +756,35 @@ bool VersionCheck()
                         const char* temp_path = getenv("TEMP");
                         size_t length = strlen(temp_path);
 
-                        std::cout << temp_path << std::endl;
+                        std::cout << "My temp path : " << temp_path << std::endl;
 
-                        std::wstring wTemp_path(length, L'#');
+                        std::wstring wTemp_path_zip(length, L'#');
 
                         //#pragma warning (disable : 4996)
                         // Or add to the preprocessor: _CRT_SECURE_NO_WARNINGS
-                        mbstowcs(&wTemp_path[0], temp_path, length);
+                        mbstowcs(&wTemp_path_zip[0], temp_path, length);
 
-                        //std::wstring wfolder_Path = L"C:\\Users\\mslm01\\Downloads\\"; 
-
+                        /*zip파일 이름 붙이기*/
                         //if ((_waccess(wfolder_Path.c_str(), 0)) == -1)
                         //	CreateDirectory(wfolder_Path.c_str(), NULL);
-                        wTemp_path += L"\\MSLM_Ver_";
-                        wTemp_path += info[L"server_ver"].as_string();
-
+                        wTemp_path_zip += L"\\MSLM_Ver_";
+                        wTemp_path_zip += info[L"server_ver"].as_string();
+                        wTemp_path_zip += L".zip";
                         std::cout << "current version is not latest version\n download file!" << std::endl;
 
                         /*zip파일 다운로드*/
-                        downloadFile(zip_data.c_str(), size, wTemp_path + L".zip");
+                        downloadFile(zip_data.c_str(), size, wTemp_path_zip);
 
-
+                        /*zip파일 압축 해제*/
+                        std::string Temp_path_zip;
+                        convert_wstr2str(wTemp_path_zip, Temp_path_zip);
+                        Unzip(&Temp_path_zip[0], execute_filepath);
 
 
                         /*설치파일 해시 생성*/
                         size_t hash_packet_size = 0;
                         char Client_hash[65];
-                        const char* hash_data = sha256_file(wTemp_path, hash_packet_size, Client_hash);
+                        const char* hash_data = sha256_file(execute_filepath, hash_packet_size, Client_hash);
 
                         std::string Server_hash;
                         convert_wstr2str(info[L"file_hash"].as_string(), Server_hash);
@@ -572,14 +792,17 @@ bool VersionCheck()
                         if (!_strcmpi(Client_hash, Server_hash.c_str()))
                         {
                             std::cout << "파일 해시 일치" << std::endl;
-                            //HINSTANCE result = ShellExecute(NULL, _T("runas"), wfolder_Path.c_str(), NULL, NULL, SW_SHOW);
+                            HINSTANCE result = ShellExecute(NULL, _T("runas"), execute_filepath.c_str(), NULL, NULL, SW_SHOW);
                         }
                         else
                         {
                             /*파일 해시가 불 일치할 경우 파일 재 다운로드 및 해시 검사*/
-                            std::cout << "파일 해시 불 일치 \n다운로드 재시작" << std::endl;
-
+                            std::cout << "파일 해시 불 일치 \n" << std::endl;
                         }
+                    }
+                    else
+                    {
+                        std::cerr << "download url request error, status code : " << response.status_code() << std::endl;
                     }
                 }).wait();
         }
